@@ -17,6 +17,7 @@ import android.content.Intent;
 import android.util.Log;
 
 import org.apache.cordova.CordovaPlugin;
+import org.apache.cordova.PermissionHelper;
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.PluginResult;
 
@@ -98,7 +99,11 @@ public class BarcodeScanner extends CordovaPlugin {
                 return true;
             }
         } else if (action.equals(SCAN)) {
-            scan(args);
+            if(!PermissionHelper.hasPermission(this, Manifest.permission.CAMERA)) {
+                PermissionHelper.requestPermission(this, 0, Manifest.permission.CAMERA);
+            } else {
+                scan(args);
+            }
         } else {
             return false;
         }
