@@ -21,7 +21,8 @@ import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.PermissionHelper;
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.PluginResult;
-
+import android.content.pm.PackageManager;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.util.Log;
 
 /**
@@ -47,9 +48,10 @@ public class BarcodeScanner extends CordovaPlugin {
     private static final String EMAIL_TYPE = "EMAIL_TYPE";
     private static final String PHONE_TYPE = "PHONE_TYPE";
     private static final String SMS_TYPE = "SMS_TYPE";
-
+    public static final int TAKE_PIC_SEC = 0;
     private static final String LOG_TAG = "BarcodeScanner";
-
+    protected final static String[] permissions = { Manifest.permission.CAMERA};
+    private JSONArray ARGS;
     private CallbackContext callbackContext;
 
     /**
@@ -100,11 +102,8 @@ public class BarcodeScanner extends CordovaPlugin {
                 return true;
             }
         } else if (action.equals(SCAN)) {
-            if(!PermissionHelper.hasPermission(this, Manifest.permission.CAMERA)) {
-                PermissionHelper.requestPermission(this, 0, Manifest.permission.CAMERA);
-            } else {
-                scan(args);
-            }
+            this.ARGS = args;
+            CallToScan(args);
         } else {
             return false;
         }
@@ -114,6 +113,52 @@ public class BarcodeScanner extends CordovaPlugin {
     /**
      * Starts an intent to scan and decode a barcode.
      */
+    public void CallToScan(JSONArray args){
+        boolean hasCameraPermission = PermissionHelper.hasPermission(this, Manifest.permission.CAMERA);
+
+        if (!hasCameraPermission) {
+            hasCameraPermission = true;
+            try {
+                PackageManager packageManager = this.cordova.getActivity().getPackageManager();
+                String[] permissionsInPackage = packageManager.getPackageInfo(this.cordova.getActivity().getPackageName(), PackageManager.GET_PERMISSIONS).requestedPermissions;
+                if (permissionsInPackage != null) {
+                    for (String permission : permissionsInPackage) {
+                        if (permission.equals(Manifest.permission.CAMERA)) {
+                            hasCameraPermission = false;
+                            break;
+                        }
+                    }
+                }
+            } catch (NameNotFoundException e) {
+                // We are requesting the info for our package, so this should
+                // never be caught
+            }
+        }
+        if (hasCameraPermission) {
+            scan(args);
+        } else {
+            PermissionHelper.requestPermission(this, TAKE_PIC_SEC, Manifest.permission.CAMERA);
+        }
+    }
+    public void onRequestPermissionResult(int requestCode, String[] permissions,
+                                          int[] grantResults) throws JSONException
+    {
+        for(int r:grantResults)
+        {
+            if(r == PackageManager.PERMISSION_DENIED)
+            {
+                this.callbackContext.error("PERMISSION_DENIED");
+                this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, 20));
+                return;
+            }
+        }
+        switch(requestCode)
+        {
+            case TAKE_PIC_SEC:
+                scan(this.ARGS);
+                break;
+        }
+    }
     public void scan(JSONArray args) {
         Intent intentScan = new Intent(SCAN_INTENT);
         intentScan.addCategory(Intent.CATEGORY_DEFAULT);
